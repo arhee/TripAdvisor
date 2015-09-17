@@ -1,0 +1,66 @@
+<html webdriver="true"><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta name="ROBOTS" content="NOINDEX, NOFOLLOW">
+  </head>
+  <body>
+    <script type="text/javascript">
+      var query_string = {};
+      var query = window.location.hash.substring(1);
+      var vars = query.split("&");
+      for (var i = 0; i < vars.length; i++) {
+        var pair = vars[i].split("=");
+          // If first entry with this name
+        if (typeof query_string[pair[0]] === "undefined") {
+          query_string[pair[0]] = pair[1];
+          // If second entry with this name
+        } else if (typeof query_string[pair[0]] === "string") {
+          var arr = [ query_string[pair[0]], pair[1] ];
+          query_string[pair[0]] = arr;
+          // If third or later entry with this name
+        } else {
+          query_string[pair[0]].push(pair[1]);
+        }
+      }
+      var google_conversion_id = 1020463497;
+      var google_conversion_language = "en";
+      var google_conversion_format = "3";
+      var google_conversion_color = "666666";
+      var google_conversion_label = "VFtrCMfC5AIQiZPM5gM";
+      var google_conversion_value = 0;
+      var google_dynx_itemid = [];
+      if (query_string["geoId"]) {
+        google_dynx_itemid.push(query_string["geoId"] + "|" + query_string["locale"]);
+      }
+      var device = query_string["device"];
+      var google_tag_params = {
+        POS: query_string["locale"],
+        destcity: query_string["geoName"],
+        GeoId: query_string["geoId"],
+        PropId: query_string["propId"],
+        checkindate: query_string["dateIn"],
+        checkoutdate: query_string["dateOut"],
+        dynx_itemid: google_dynx_itemid,
+        mobile: (device === "Desktop" || device === "Tablet") ? "n" : "y",
+        bid_bucket: query_string["geoFeedBucket"],
+        servlet: (query_string["isClickout"] === "true" ? "MetaConversion" : query_string["trueServlet"]),
+        travel_destid: query_string["geoId"],
+        travel_startdate: query_string["dateIn"],
+        travel_enddate: query_string["dateOut"],
+        hrental_startdate: query_string["dateIn"],
+        hrental_enddate: query_string["dateOut"]
+      };
+      if (query_string["propId"]) {
+        google_tag_params["hrental_id"] = query_string["propId"];
+      } else {
+        google_tag_params["hrental_id"] = query_string["loc1"];
+      }
+      if (query_string["pageType"]) {
+        google_tag_params["travel_pagetype"] = query_string["pageType"];
+      }
+      var google_custom_params = window.google_tag_params;
+      var google_remarketing_only = true;
+    </script>
+    <script src="google-v2560792097a_data/conversion.js"></script><img alt="" src="google-v2560792097a_data/a.gif" height="1" border="0" width="1">
+  
+
+</body></html>
