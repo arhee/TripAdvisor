@@ -2,6 +2,7 @@ from reviews import Review
 import random
 import time
 import re
+import sys
 from bs4 import BeautifulSoup as bs
 import page_property
 
@@ -66,16 +67,21 @@ class ParentCrawler(object):
 
     def get_trunc_list(self, div_list):
         # this function returns a truncated list based on the bookmarks
-        link = self.get_bookmark_url()
-        if self.restart == False or not link:
+        if self.restart == False:
             return div_list
+
+        bookmark_url = self.get_bookmark_url()
+
+        if not bookmark_url:
+            return div_list
+
         kind, loc, url = zip(*div_list)
-        link = re.sub('-or\d+', '', link)                
+        link = re.sub('-o\w\d+', '', bookmark_url)                
         link = re.sub('#REVIEWS', '', link)                
         #will throw a value error if link not in url
         idx = url.index(link) if link in url else 0
         div_list = div_list[idx:]
-        div_list[0] = (div_list[0][0], div_list[0][1], link)
+        div_list[0] = (div_list[0][0], div_list[0][1], bookmark_url)
         return div_list
     
     def execfct(self, item):
@@ -83,7 +89,6 @@ class ParentCrawler(object):
         self.review_crawler.update_attr(self.attrs)
         self.review_crawler.update_attr({'item_reviewed':item[1]})
         self.review_crawler.first = True
-        print 'starting review'
         self.review_crawler.start()
 
     def get_next_url(self, soup):
@@ -98,7 +103,7 @@ class ParentCrawler(object):
         while self.url: 
             self.update_bookmarker( {self.pagetype:self.url} )
             self.driver.get(self.url)
-            time.sleep(random.randint(5,10))            
+            time.sleep(2 + random.random() * 1)            
             html = self.driver.page_source
             soup = bs(html)
 
@@ -106,13 +111,11 @@ class ParentCrawler(object):
             div_list = self.get_url_list(soup)       
             div_list = self.get_trunc_list(div_list)
             
-            # has to be in order....!!!
-            for item in div_list[:1]:
+            for item in div_list:
                 if item[0] == 'review':
-                    print 'review', item
                     self.execfct(item)
                 elif item[0] == 'group':
-                    print 'group'
+#                    continue
                     self.url = item[2]
                     self.pagetype = 'group_page'
                     self.update_attr( {'parent_group': item[1]} )
@@ -136,6 +139,9 @@ class ReviewCrawler(object):
         self.review_list = None
         self.attrs = {}
         self.first = True
+        self.sleep = False
+
+        random.seed(208)
 
     def update_attr(self, new_attrs):
         self.attrs.update(new_attrs)
@@ -158,7 +164,7 @@ class ReviewCrawler(object):
             element[0].click()
         except:
             pass
-        time.sleep(3)
+        time.sleep(random.randint(3,5))
 
         #Close the popup
         html = self.driver.page_source
@@ -187,24 +193,46 @@ class ReviewCrawler(object):
         review = Review(review_soup, self.attrs)
         self.review_list.append(review)
 
+    def clean_url(self, url):
+        link = re.sub('-or\d+', '', url)                
+        return re.sub('#REVIEWS', '', link)                
+
+
     def start(self):
+        avgs = [0,1]
         while self.url: 
+            start = time.time()
+
             self.update_bookmarker({self.pagetype:self.url})
             self.driver.get(self.url)
-            time.sleep(random.randint(5,10))            
             self.process_page()
             html = self.driver.page_source
             soup = bs(html)
 
             if self.first == True:
                 self.first = False
-                first_page = page_property.ReviewPage(soup, self.attrs, self.review_list.dbname, self.url)
+                first_page = page_property.ReviewPage(soup, self.attrs, self.review_list.dbname, self.clean_url(self.url))
                 first_page.DBdump()
                 self.attrs['item_url'] = self.url
 
-
-                # get attraction properties f(soup)    
             div_list = self.get_url_list(soup)            
             for item in div_list:
+                if random.random() < 0.005 and self.sleep == True:
+                    num = random.randint(120, 180)
+                    print 'sleeping for ', num
+                    time.sleep(num)
+                    print 'started again'
                 self.execfct(item)
+
+            elapsed = time.time() - start
+        
+            avgs[0] = elapsed/avgs[1] + avgs[0] * (1 - 1./avgs[1])
+            avgs[1] += 1
+            sys.stdout.flush()
+            sys.stdout.write("\r average time/page: % f" % avgs[0])
             self.url = self.get_next_url(soup)
+            if not self.url:
+                time.sleep(2)
+                self.url = self.get_next_url(soup)
+
+            

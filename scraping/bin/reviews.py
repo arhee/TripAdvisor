@@ -1,5 +1,6 @@
 from bs4 import BeautifulSoup as bs
 import sqlite3
+import re
 
 class Review(object):
     """
@@ -17,6 +18,8 @@ class Review(object):
             for k, v in new_attr.items():
                 if k in parent_attr:
                     self.attr[k] = v
+
+        self.attr['item_url'] = self.clean_url(new_attr['item_url'])
                 
         self.attr['rating'] = self.get_rating()
         self.attr['review'] = self.get_review()
@@ -29,6 +32,10 @@ class Review(object):
         self.attr['user_home'] = self.get_userhome()
         self.attr['key'] = self.attr['uid'] + '-' + str(self.attr['reviewID']) 
         
+    def clean_url(self, url):
+        link = re.sub('-or\d+', '', url)                
+        return re.sub('#REVIEWS', '', link)                
+
     def get_rating(self):        
         tag = self.soup.find(lambda tag: tag.name == 'img' and tag.has_attr('alt') and 'stars' in tag['alt'])
         return int(tag['alt'][0])
@@ -82,6 +89,7 @@ class Review(object):
         return self.attr.values()
     
 
+
 class ReviewList(object):
     """
     This class holds all the Review objects and can insert them into a sqlite3 database
@@ -92,7 +100,7 @@ class ReviewList(object):
         self.dbname = dbname
         self.tbl_schema = tbl_schema
         self.tbl_name = tbl_name
-        self.dumpsize = 3
+        self.dumpsize = 10
         
     def size(self):
         return len(self.reviews)

@@ -27,4 +27,5 @@ review_schema = """
 		rank INT,
 		country TEXT,
 		type TEXT,
+		tags TEXT,
 		location TEXT)"""

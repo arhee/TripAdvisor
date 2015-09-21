@@ -22,7 +22,12 @@ class ReviewPage(object):
         self.attr['rank'] = self.get_rank()
         self.attr['coe'] = self.get_coe()
         self.attr['name'] = self.get_name()
+        self.attr['tags'] = self.get_tags()
         
+    def get_tags(self):
+        tags = self.soup.find('div',{'class':'heading_details'})
+        return tags.find('div',{"class":'detail'}).text.strip()
+
     def get_choice_award(self):
         if self.soup.find('img',{'alt':'Travelers\' Choice award winner'}):
             return 1

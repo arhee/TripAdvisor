@@ -33,7 +33,6 @@ class ParentCrawler(object):
         self.group_crawler.base_url = self.base_url
         self.group_crawler.bookmarker = self.bookmarker
 
-            
     def get_url_list(self, soup):
         tags = soup.findAll('div',{'class':'element_wrap'})
         div_list = []
@@ -45,9 +44,18 @@ class ParentCrawler(object):
             else:
                 raise TypeError('Neither group or review')
             subtag = x.find('div',{'class':'property_title'})
-            div_list.append( (category, re.sub('\(\d+\)','', subtag.a.text).strip(), self.base_url + subtag.a['href']))
-        return div_list
 
+            try:
+                num_reviews = x.find('div',{'class':'rs rating'}).a.text
+                num_reviews = num_reviews.replace('reviews','').strip()
+                num_reviews = int(num_reviews)
+            except AttributeError:
+                num_reviews = 0
+
+            location = re.sub('\(\d+\)','', subtag.a.text).strip()
+            url = self.base_url + subtag.a['href']
+            div_list.append( {'category':re.sub('\(\d+\)',''), 'location':location, 'num_reviews':num_reviews, 'url':url}
+        return div_list
 
     def get_bookmark_url(self):
         bookmark_review_page = self.bookmarker.bookmarks.get('review_page', None)     
@@ -99,6 +107,23 @@ class ParentCrawler(object):
         except (TypeError, AttributeError):
             return None
 
+    def check_duplicate(self):
+        # i need url, number of reviews
+        with sqlite3.connect(self.dbname) as conn:
+            cur = conn.cursor()
+            qry = """SELECT count(*), item_url FROM vietnam 
+                    where item_url = {}
+                    GROUP BY item_url
+                    """.format('?')
+            cur.execute(qry, [url])
+            result = cur.fetchall()
+
+        if result and result[0][0] == num:
+            return True
+        return False
+
+
+
     def start(self):
         while self.url: 
             self.update_bookmarker( {self.pagetype:self.url} )
@@ -113,6 +138,9 @@ class ParentCrawler(object):
             
             for item in div_list:
                 if item[0] == 'review':
+                    #check if already in sql
+                    #if check_duplicate(url):
+                    # pass item.  item needs to have url, and numreviews
                     self.execfct(item)
                 elif item[0] == 'group':
 #                    continue

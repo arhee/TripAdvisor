@@ -71,17 +71,18 @@ class ParentCrawler(object):
             return div_list
 
         bookmark_url = self.get_bookmark_url()
-
         if not bookmark_url:
             return div_list
 
+        print 'trunc_list'
         kind, loc, url = zip(*div_list)
-        link = re.sub('-o\w\d+', '', bookmark_url)                
+        link = re.sub('-or\d+', '', bookmark_url)                
         link = re.sub('#REVIEWS', '', link)                
         #will throw a value error if link not in url
         idx = url.index(link) if link in url else 0
         div_list = div_list[idx:]
         div_list[0] = (div_list[0][0], div_list[0][1], bookmark_url)
+        print div_list
         return div_list
     
     def execfct(self, item):
@@ -112,6 +113,7 @@ class ParentCrawler(object):
             div_list = self.get_trunc_list(div_list)
             
             for item in div_list:
+                print "ITEM: -------", item
                 if item[0] == 'review':
                     self.execfct(item)
                 elif item[0] == 'group':
