@@ -1,6 +1,6 @@
 # tripadvisor (under construction)
 
-Tripadvisor analysis.  Main presentation contained in <a href=" ">tripadvisor.ipynb</a>
+Tripadvisor analysis.  Main presentation contained in <a href="http://nbviewer.ipython.org/github/arhee/tripadvisor/blob/master/tripadvisor.ipynb">tripadvisor.ipynb</a>
 
 Tripadvisor scraper located <a href="https://github.com/arhee/tripadvisor_scraper"> here </a>
 
