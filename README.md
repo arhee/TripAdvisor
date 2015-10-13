@@ -2,10 +2,14 @@
 
 Tripadvisor analysis, for presentation see tripadvisor.ipynb. 
 
-### data
+#### data
 
 Contains tools used to process data
 
-### models
+#### models
 
 Contains code for mathematical models referenced in tripadvisor.ipynb.
+
+#### figs
+
+Figures for tripadvisor.ipynb
