@@ -1,6 +1,8 @@
 # tripadvisor (under construction)
 
-Tripadvisor analysis, for presentation see tripadvisor.ipynb. 
+Tripadvisor analysis.  Main presentation contained in <a href=" ">tripadvisor.ipynb</a>
+
+Tripadvisor scraper located <a href="https://github.com/arhee/tripadvisor_scraper"> here </a>
 
 #### data
 
