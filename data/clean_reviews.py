@@ -8,6 +8,9 @@ import itertools
 from nltk.corpus import stopwords
 
 class Cleaner(object):
+	"""
+	the sql query in get_reviews needs to be customized
+	"""
 	def __init__(self):
 		self.sbstem = SnowballStemmer("english")
 		replace = string.punctuation + string.digits
@@ -34,15 +37,15 @@ class Cleaner(object):
 		self.cached_stopwords.extend(loc_wordlist)
 		return loc_wordlist
 
-def get_reviews(dbname):
+def get_reviews(dbname, qry):
 	with sqlite3.connect(dbname) as conn:
 	    cur = conn.cursor()
 	    # can edit qry to select items with > reviews
-	    qry = """SELECT key, review_text, title, location
-	            FROM reviews
-	            WHERE lang = 'en'
-	            AND country = "Laos"
-	            """
+#	    qry = """SELECT key, review_text, title, location
+#	            FROM reviews
+#	            WHERE lang = 'en'
+#	            AND country != "USA"
+#	            """
 	    cur.execute(qry)
 	    data = cur.fetchall()
 	return data
@@ -61,34 +64,37 @@ def db_insert_text(dbname, text, key):
 	    cur.execute(qry, [text, key])
 	    conn.commit()
 
-#if __name__ == "__main__":
-print "Retrieving Reviews"
-fname = 'mod_trip_advisor.db'
-data = get_reviews(fname)
+"""
+Includes the title + review text
+"""
+if __name__ == "__main__":
+	print "Retrieving Reviews"
+	fname = 'mod_trip_advisor.db'
+	data = get_reviews(fname)
 
-cleaner = Cleaner()
-locations = set([x[3] for x in data])
-cleaner.make_loclist(locations)
-	
-t0 = time.time()
-print "Starting Loop\n"
+	cleaner = Cleaner()
+	locations = set([x[3] for x in data])
+	cleaner.make_loclist(locations)
+		
+	t0 = time.time()
+	print "Starting Loop\n"
 
-subt0 = t0
+	subt0 = t0
 
-for idx, review in enumerate(data):
-	if not idx % 1000:
-		sys.stdout.flush()
-		elapsed = (time.time() - subt0)/60
-		sys.stdout.write('\r idx:{}, elapsed time:{:.2f}min'.format(idx, elapsed))
-		subt0 = time.time()
-	key = review[0]
-	review_text = review[1]
-	title = review[2]
+	for idx, review in enumerate(data):
+		if not idx % 1000:
+			sys.stdout.flush()
+			elapsed = (time.time() - subt0)/60
+			sys.stdout.write('\r idx:{}, elapsed time:{:.2f}min'.format(idx, elapsed))
+			subt0 = time.time()
+		key = review[0]
+		review_text = review[1]
+		title = review[2]
 
-	text = review_text + title
+		text = review_text + title
 
-	cleaned = cleaner.clean(text)
-	db_insert_text(fname, cleaned, key)
+		cleaned = cleaner.clean(text)
+		db_insert_text(fname, cleaned, key)
 
-print "total time: {:.2f}mins".format((time.time()-t0)/60)
+	print "total time: {:.2f}mins".format((time.time()-t0)/60)
 
