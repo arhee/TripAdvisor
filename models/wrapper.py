@@ -68,8 +68,8 @@ class ModelWrapper(object):
                 sys.stdout.flush()
                 sys.stdout.write('\r CV loop #{}\n'.format(i+1))
 
-            random.seed(self.SEED * i)
-            random.shuffle(self.review_list)
+            #random.seed(self.SEED * i)
+            #random.shuffle(self.review_list)
 
             pt = int( self.test_size * len(self.review_list) )
             test_list = self.review_list[:pt]
@@ -97,37 +97,95 @@ def run():
     nusers = len( set( map(lambda x: x.uid, data.review_list)) )
     nitems = len( set( map(lambda x: x.aid, data.review_list)) )
     
-    model = BiasSVD(nusers, nitems)
+    #model = BiasSVD(nusers, nitems)
     #model = PlainSVD(nusers, nitems)
     #model = LinearModel(nusers, nitems)
-    #model = Average()
+    model = Average()
     model.verbose = False
     
     print "Running Model ..."
     mw = ModelWrapper(data.review_list)
-    mw.cv_iters = 3
+    mw.cv_iters = 1
 
     savename = 'biasSVD'
     mw.save_file = savename + '.npy'
     #mw.start(model)
     
-    #reg_term = [round_to_1(x) for x in np.linspace(0.001, 0.01, num=5)]
-    #lrates = [round_to_1(x) for x in np.logspace(log10(0.001), log10(0.01), num=5)]
+    
+    #reg_terms = [round_to_1(x) for x in np.logspace(log10(0.001), log10(0.1), num=3)]
+    lrates = [round_to_1(x) for x in np.logspace(log10(0.001), log10(0.1), num=10)]
+    max_train_iters = [3,5,7]
+    nfeats = [3,5,7]
+
     #reg_terms = [round_to_1(x) for x in np.logspace(log10(0.003), log10(0.03), num=5)]
     #lrates = [round_to_1(x) for x in np.linspace(0.03, 0.09, num=5)]
-    params = {'max_train_iters':[6,8,10], 'nfeats':[5,10,15,20]}
-    
-    
-    #model.max_train_iters = 2
+    #params = {'max_train_iters':[6,8,10], 'nfeats':[5,10,15,20]}
+    params = {'nfeats':nfeats, 'lrate':lrates, 'max_train_iters':[1,5,10]}
+    #model.max_train_iters = 1
+    #model.lrate = 0.01
     model.reg_term = 0.01
-    #model.nfeats = 8
-    model.lrate = 0.001
+
+
+    with open(savename + '.json','w') as f:
+        json.dump(params.items(), f)
+
+    
+    mw.param_search(model, params)
     
 
+def debug():
+    print "Loading Data...."
+    data = Parse('../data/mod_trip_advisor.db')
+    nusers = len( set( map(lambda x: x.uid, data.review_list)) )
+    nitems = len( set( map(lambda x: x.aid, data.review_list)) )
+    
+    lrate = 0.01
+    reg_term = 0.01
+    max_train = 1
+    nfeats = 1
+
+    model = BiasSVD(nusers, nitems)
+    model.lrate = lrate
+    model.reg_term = reg_term
+    model.max_train = max_train
+    model.nfeats = nfeats
+    mw = ModelWrapper(data.review_list)
+    mw.cv_iters = 1
+
+    print "Running BiasSVD Model ..."
+    mw.start(model)
+
+    #model = LinearModel(nusers, nitems)
+    model = PlainSVD(nusers, nitems)
+    model.lrate = lrate
+    model.reg_term = reg_term
+    model.max_train = max_train
+    model.nfeats = nfeats
+    mw = ModelWrapper(data.review_list)
+
+    print "Running SVD Model ..."
+    mw.start(model)
+
+"""
+Linear
+Running Model ...
+test error: 0.796, train error 0.782, time 0.12mins
+
+biasSVD - Linear
+Running Model ...
+test error: 0.795, train error 0.782, time 0.05mins
+
+Loading Data....
+Running BiasSVD Model ...
+test error: 0.785, train error 0.741, time 0.21mins
+Running SVD Model ...
+test error: 0.786, train error 0.742, time 0.18mins
+
+"""
 
 
 
-    data = mw.param_search(model, params)
+
 """
     with open(savename + '.npy','w') as f:    
         np.save(f, data)
@@ -139,3 +197,4 @@ def run():
 
 if __name__ == '__main__':
     run()
+    #debug()

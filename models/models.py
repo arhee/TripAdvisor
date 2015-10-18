@@ -121,7 +121,7 @@ class LinearModel(Model):
         return err**2
 
     def predict(self, review):
-        return self.avg + self.abias[review.aid] + self.ubias[review.uid]
+        return self.proper_rating(self.avg + self.abias[review.aid] + self.ubias[review.uid])
 
 class NeighborSearch(Model):
     def __init__(self, nusers, nitems):
@@ -230,12 +230,14 @@ class SVD(Model):
 
 
 class BiasSVD(SVD):
+    # to check this.  I need to compare against both linear and SVD.  They're both working
+
     def __init__(self, nusers, nitems):    
         super(BiasSVD, self).__init__(nusers, nitems)
-        self.lrate = 0.01
+        # ubias, abias are located in SVD.setup()
 
     def iterate(self, review, k):
-        err = review.rating - self.cached_predict(review.uid, review.aid, k)
+        err = review.rating - self.cached_predict(review, k)
         self.err_track.update(err**2)
 
         uTemp = self.U[review.uid][k]
@@ -245,18 +247,18 @@ class BiasSVD(SVD):
 
         self.U[review.uid][k] += self.lrate * (err*vTemp - self.reg_term*uTemp)
         self.V[review.aid][k] += self.lrate * (err*uTemp - self.reg_term*vTemp)
-        self.ubias[review.uid] += self.lrate * (err + self.reg_term * ubias)
-        self.abias[review.aid] += self.lrate * (err + self.reg_term * abias)
-
+        self.ubias[review.uid] += self.lrate * (err - self.reg_term * ubias)
+        self.abias[review.aid] += self.lrate * (err - self.reg_term * abias)
         return err**2
-
 
     def predict(self, review):
         uid = review.uid
         aid = review.aid
         return self.proper_rating( sum(self.U[uid] * self.V[aid]) + self.ubias[uid] + self.abias[aid] + self.avg)
 
-    def cached_predict(self, uid, aid, k):
+    def cached_predict(self, review, k):
+        uid = review.uid
+        aid = review.aid
         after = (self.nfeats-k-1) * self.initval**2
         current = self.U[uid][k] * self.V[aid][k]
         before = self.cache[uid][aid]
