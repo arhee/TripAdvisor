@@ -50,9 +50,12 @@ class Model(object):
         return x
 
 
-class Average(Model):
+class AidAverage(Model):
+    """
+    Model predicts on average for the attraction
+    """
     def __init__(self):
-        super(Average, self).__init__()        
+        super(AidAverage, self).__init__()        
 
     def setup(self):
         self.avg = self.avg_rating()
@@ -80,8 +83,35 @@ class Average(Model):
     def predict(self, review):
         return self.avgdict.get(review.aid, self.avg)
 
+class GlobalAverage(Model):
+    """
+    Model predicts on global average
+    """
+    def __init__(self):
+        super(GlobalAverage, self).__init__()        
 
-class LinearModel(Model):
+    def setup(self):
+        self.avg = self.avg_rating()
+        self.avgdict = {}
+        self.size = len(self.review_list)
+
+    def train(self, review_list):
+        self.review_list = review_list
+        self.setup()
+
+        if self.verbose:
+            print "Total Training RMSE {:.3f}".format(self.get_rmse())
+
+    def predict(self, review):
+        return self.avg
+
+
+
+
+class SimpleModel(Model):
+    """
+    Model is simple bias terms: mu + ubias + abias
+    """
     def __init__(self, nusers, nitems):
         super(LinearModel, self).__init__()
         self.nitems = nitems
@@ -123,46 +153,6 @@ class LinearModel(Model):
     def predict(self, review):
         return self.proper_rating(self.avg + self.abias[review.aid] + self.ubias[review.uid])
 
-class NeighborSearch(Model):
-    def __init__(self, nusers, nitems):
-        self.uid_dict = {}
-        self.weight = np.zeros(nitems, nitems)
-        pass
-
-    def train(self, review_list):
-        self.review_list = review_list        
-        self.setup()
-        self.get_uid_dict()
-        for _ in range(self.max_train_iters):
-            self.stoc_grad_desc()
-        if self.verbose:
-            print "Total Training RMSE {:.3f}".format(self.get_rmse())
-
-
-    def get_uid_dict(self):
-        for idx, review in enumerate(self.review_list):
-            if not self.uid_dict.get(review.uid, None):
-                self.uid_dict[review.uid] = [idx]
-            else:
-                self.uid_dict[review.uid].append(idx)
-            
-
-    def stoc_grad_desc(self):
-        self.err_track = ErrorTracker()
-        for idx, review in enumerate(self.review_list):
-            if self.verbose and idx > 0 and not idx % self.print_iter:
-                print "iteration #:{} smoothed error: {:.3f}".format(idx, self.err_track.get_err())
-                self.err_track.reset()
-            self.err_track.update( self.iterate(review) )
-
-    def iterate(self, review):
-        bi = self.abias[review.aid]
-        bu = self.ubias[review.uid]
-        pred = self.avg + bi + bu
-        err = review.rating - pred    
-        self.abias[review.aid] += self.lrate * (err - self.reg_term * bi)
-        self.ubias[review.uid] += self.lrate * (err - self.reg_term * bu)
-        return err**2
 
 
 class SVD(Model):
