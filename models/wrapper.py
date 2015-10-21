@@ -61,6 +61,8 @@ class ModelWrapper(object):
 
     
     def output_preds(self, model):
+
+
         mean_error = 0.
         train_error = 0.
 
@@ -86,7 +88,7 @@ class ModelWrapper(object):
 
         print 'test error: {:.3f}, train error {:.3f}, time {:.2f}mins'.format(test_err, train_err, (time()-t0)/60)
         return test_err
-        
+
     
     def start(self, model):
         mean_error = 0.
@@ -137,16 +139,16 @@ def run():
     print "Running Model ..."
     mw = ModelWrapper(data.review_list)
 
-    savename = 'biasSVD_kfolds'
+    savename = 'biasSVD_kfolds2'
     mw.save_file = savename + '.npy'
     #mw.start(model)
     
     #reg_terms = [round_to_1(x) for x in np.logspace(log10(0.003), log10(0.03), num=5)]
     #reg_terms = [round_to_1(x) for x in np.logspace(log10(0.001), log10(0.1), num=3)]
     #lrates = [round_to_1(x) for x in np.logspace(log10(0.001), log10(0.1), num=5)]
-    lrates = [round_to_1(x) for x in np.linspace(0.005, 0.03, num=5)]
+    lrates = [round_to_1(x) for x in np.linspace(0.005, 0.03, num=10)]
     #max_train_iters = [3,5,7]
-    nfeats = [5,10,15]
+    nfeats = [10]
 
     
     
