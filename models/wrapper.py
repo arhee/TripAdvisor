@@ -139,14 +139,14 @@ def run():
     print "Running Model ..."
     mw = ModelWrapper(data.review_list)
 
-    savename = 'biasSVD_kfolds2'
+    savename = 'biasSVD_kfolds3'
     mw.save_file = savename + '.npy'
     #mw.start(model)
     
     #reg_terms = [round_to_1(x) for x in np.logspace(log10(0.003), log10(0.03), num=5)]
     #reg_terms = [round_to_1(x) for x in np.logspace(log10(0.001), log10(0.1), num=3)]
     #lrates = [round_to_1(x) for x in np.logspace(log10(0.001), log10(0.1), num=5)]
-    lrates = [round_to_1(x) for x in np.linspace(0.005, 0.03, num=10)]
+    lrates = [round_to_1(x) for x in np.linspace(0.001, 0.01, num=10)]
     #max_train_iters = [3,5,7]
     nfeats = [10]
 
