@@ -37,19 +37,20 @@ def find_err(kfdf, Xcols, model):
         model.fit(X_train, y_train.T.toarray().flatten())
     	err = model.predict(X_test).flatten() - y_test.toarray().flatten()
         error +=  (sum(err**2)/len(err))**0.5
-    return error/len(kfdf)
+    return error/len(kfdf), model
 
 #load the data
 print "reading data..."
-with open('kfolds5.p') as f:
+with open('kfolds5notnorm.p') as f:
     kfdf = pickle.load(f)
 
 
-model = Ridge()
-#model = Lasso()
+#model = Ridge()
+#model = Lasso(fit_intercept=True)
 #model = Average()
 #model = ElasticNet()
 #model = LogisticRegression()
+model = RandomForestClassifier()
 nfeats = kfdf[0]['train']['x'].shape[1]
 goodfeats= set([])
 scores = []
@@ -59,6 +60,7 @@ features = []
 print "starting search..."
 
 #while (len(goodfeats) < 2): 
+goodfeats.update([818])
 test = []
 for idx in range(nfeats):
 	addfeat = [0,10]
@@ -67,7 +69,7 @@ for idx in range(nfeats):
 
 		Xcols = list(goodfeats)
 		Xcols.append(feat)
-		feat_score = find_err(kfdf, Xcols, model)
+		feat_score, modelfit = find_err(kfdf, Xcols, model)
 
 		test.append([feat, feat_score])
 

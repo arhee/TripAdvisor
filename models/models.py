@@ -106,14 +106,12 @@ class GlobalAverage(Model):
         return self.avg
 
 
-
-
 class SimpleModel(Model):
     """
     Model is simple bias terms: mu + ubias + abias
     """
     def __init__(self, nusers, nitems):
-        super(LinearModel, self).__init__()
+        super(SimpleModel, self).__init__()
         self.nitems = nitems
         self.nusers = nusers
         self.lrate = 0.01
@@ -224,6 +222,7 @@ class BiasSVD(SVD):
 
     def __init__(self, nusers, nitems):    
         super(BiasSVD, self).__init__(nusers, nitems)
+        self.initval = 0
         # ubias, abias are located in SVD.setup()
 
     def iterate(self, review, k):

@@ -13,7 +13,7 @@ import sys
 import random
 from time import time, sleep
 from helper import Parse, Review
-from models import PlainSVD, BiasSVD, LinearModel, AidAverage, GlobalAverage
+from models import PlainSVD, BiasSVD, SimpleModel, AidAverage, GlobalAverage
 from itertools import product, izip
 import json
 import pdb
@@ -59,6 +59,33 @@ class ModelWrapper(object):
 
         return data
 
+    
+    def output_preds(self, model):
+        mean_error = 0.
+        train_error = 0.
+
+        t0 = time()
+        
+        if model.verbose:
+            sys.stdout.flush()
+            sys.stdout.write('\r CV loop #{}\n'.format(i+1))
+
+        kf = cross_validation.KFold(len(self.review_list), n_folds=5, shuffle=True, random_state = 0)
+        for train_idx, test_idx in kf:
+
+            test_list = [ self.review_list[idx] for idx in test_idx ]
+            train_list = [ self.review_list[idx] for idx in train_idx ]
+
+            model.train(train_list)
+            train_error += model.get_rmse()
+            mean_error += model.test(test_list)
+
+            
+        test_err = mean_error/5
+        train_err = train_error/5
+
+        print 'test error: {:.3f}, train error {:.3f}, time {:.2f}mins'.format(test_err, train_err, (time()-t0)/60)
+        return test_err
         
     
     def start(self, model):
@@ -71,16 +98,8 @@ class ModelWrapper(object):
             sys.stdout.flush()
             sys.stdout.write('\r CV loop #{}\n'.format(i+1))
 
-        #random.seed(self.SEED * i)
-        #random.shuffle(self.review_list)
-
-        pt = int( self.test_size * len(self.review_list) )
-
         kf = cross_validation.KFold(len(self.review_list), n_folds=5, shuffle=True, random_state = 0)
-
         for train_idx, test_idx in kf:
-            
-            #test_list = self.review_list[test_idx]
 
             test_list = [ self.review_list[idx] for idx in test_idx ]
             train_list = [ self.review_list[idx] for idx in train_idx ]
@@ -108,103 +127,52 @@ def run():
     nusers = len( set( map(lambda x: x.uid, data.review_list)) )
     nitems = len( set( map(lambda x: x.aid, data.review_list)) )
     
-    #model = BiasSVD(nusers, nitems)
+    model = BiasSVD(nusers, nitems)
     #model = PlainSVD(nusers, nitems)
-    #model = LinearModel(nusers, nitems)
-    model = AidAverage()
+    #model = SimpleModel(nusers, nitems)
+    #model = AidAverage()
     #model = GlobalAverage()
     model.verbose = False
     
     print "Running Model ..."
     mw = ModelWrapper(data.review_list)
-    mw.cv_iters = 1
 
-    savename = 'biasSVD'
+    savename = 'biasSVD_kfolds'
     mw.save_file = savename + '.npy'
-    mw.start(model)
+    #mw.start(model)
     
-    
-    #reg_terms = [round_to_1(x) for x in np.logspace(log10(0.001), log10(0.1), num=3)]
-    lrates = [round_to_1(x) for x in np.logspace(log10(0.001), log10(0.1), num=10)]
-    max_train_iters = [3,5,7]
-    nfeats = [3,5,7]
-
     #reg_terms = [round_to_1(x) for x in np.logspace(log10(0.003), log10(0.03), num=5)]
-    #lrates = [round_to_1(x) for x in np.linspace(0.03, 0.09, num=5)]
+    #reg_terms = [round_to_1(x) for x in np.logspace(log10(0.001), log10(0.1), num=3)]
+    #lrates = [round_to_1(x) for x in np.logspace(log10(0.001), log10(0.1), num=5)]
+    lrates = [round_to_1(x) for x in np.linspace(0.005, 0.03, num=5)]
+    #max_train_iters = [3,5,7]
+    nfeats = [5,10,15]
+
+    
+    
     #params = {'max_train_iters':[6,8,10], 'nfeats':[5,10,15,20]}
-    params = {'nfeats':nfeats, 'lrate':lrates, 'max_train_iters':[1,5,10]}
+    model.max_train_iters = 5
+    params = {'nfeats':nfeats, 'lrate':lrates}
     #model.max_train_iters = 1
-    #model.lrate = 0.01
+    model.lrate = 0.01
     model.reg_term = 0.01
-
-
-#    with open(savename + '.json','w') as f:
- #       json.dump(params.items(), f)
-
-    
-  #  mw.param_search(model, params)
-    
-
-def debug():
-    print "Loading Data...."
-    data = Parse('../data/mod_trip_advisor.db')
-    nusers = len( set( map(lambda x: x.uid, data.review_list)) )
-    nitems = len( set( map(lambda x: x.aid, data.review_list)) )
-    
-    lrate = 0.01
-    reg_term = 0.01
-    max_train = 1
-    nfeats = 1
-
-    model = BiasSVD(nusers, nitems)
-    model.lrate = lrate
-    model.reg_term = reg_term
-    model.max_train = max_train
-    model.nfeats = nfeats
-    mw = ModelWrapper(data.review_list)
-    mw.cv_iters = 1
-
-    print "Running BiasSVD Model ..."
-    mw.start(model)
-
-    #model = LinearModel(nusers, nitems)
-    model = PlainSVD(nusers, nitems)
-    model.lrate = lrate
-    model.reg_term = reg_term
-    model.max_train = max_train
-    model.nfeats = nfeats
-    mw = ModelWrapper(data.review_list)
-
-    print "Running SVD Model ..."
-    mw.start(model)
-
-"""
-Linear
-Running Model ...
-test error: 0.796, train error 0.782, time 0.12mins
-
-biasSVD - Linear
-Running Model ...
-test error: 0.795, train error 0.782, time 0.05mins
-
-Loading Data....
-Running BiasSVD Model ...
-test error: 0.785, train error 0.741, time 0.21mins
-Running SVD Model ...
-test error: 0.786, train error 0.742, time 0.18mins
-
-"""
-
-
-
-
-"""
-    with open(savename + '.npy','w') as f:    
-        np.save(f, data)
 
     with open(savename + '.json','w') as f:
         json.dump(params.items(), f)
+
+    
+    mw.param_search(model, params)
+    
 """
+Simple model
+parameters:  {'max_train_iters': 10, 'lrate': 0.01}
+test error: 0.763, train error 0.693, time 1.10mins
+
+SVD
+parameters:  {'nfeats': 10, 'lrate': 0.01, maxtrain: 5, lrate:0.01}
+test error: 0.761, train error 0.635, time 13.61mins
+"""
+
 
 
 if __name__ == '__main__':
