@@ -15,6 +15,8 @@ class Parse(object):
         self.dbname = dbname
         self.lines = self.get_sql_data()
         self.parse_lines(self.lines)
+        self.nusers = None
+        self.nitems = None
         
     def get_sql_data(self):
         dbname = self.dbname
@@ -44,6 +46,7 @@ class Parse(object):
             aid = aid_dict[k[1]]
             rating = v[0]/float(v[1])
             self.review_list.append(Review(uid,aid,rating))
+
                     
     def get_unique_reviews(self, qry_lines):
         """

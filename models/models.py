@@ -83,32 +83,130 @@ class AidAverage(Model):
     def predict(self, review):
         return self.avgdict.get(review.aid, self.avg)
 
-class GlobalAverage(Model):
+
+class BaseModel(Model):
     """
-    Model predicts on global average
+    This is the base model: r = global_avg
     """
     def __init__(self):
-        super(GlobalAverage, self).__init__()        
-
-    def setup(self):
-        self.avg = self.avg_rating()
-        self.avgdict = {}
-        self.size = len(self.review_list)
+        super(BaseModel, self).__init__()
 
     def train(self, review_list):
         self.review_list = review_list
         self.setup()
+        iter_error = float('inf')
+
+        for _ in range(self.max_train_iters):
+            self.stoc_grad_desc()
+            rmse = round(self.get_rmse(), 3)
+            if rmse >= iter_error:
+                break
+            else:
+                iter_error = rmse
 
         if self.verbose:
             print "Total Training RMSE {:.3f}".format(self.get_rmse())
 
+    def stoc_grad_desc(self):
+        self.err_track = ErrorTracker()
+        for idx, review in enumerate(self.review_list):
+            if self.verbose and idx > 0 and not idx % self.print_iter:
+                print "iteration #:{} smoothed error: {:.3f}".format(idx, self.err_track.get_err())
+                self.err_track.reset()
+            self.err_track.update( self.iterate(review) )
+
+
+class ItemModel(BaseModel):
+    """
+    Model is : r = global_avg + item_bias
+    """
+    def __init__(self, nitems):
+        super(ItemModel, self).__init__()
+        self.nitems = nitems
+        self.lrate = 0.01
+        self.reg_term = 0.01
+
+    def setup(self):
+        self.abias = np.zeros(self.nitems)
+        self.avg = self.avg_rating()
+        self.size = len(self.review_list)
+
+    def iterate(self, review):
+        bi = self.abias[review.aid]
+        pred = self.avg + bi
+        err = review.rating - pred    
+        self.abias[review.aid] += self.lrate * (err - self.reg_term * bi)
+        return err**2
+
     def predict(self, review):
-        return self.avg
+        return self.proper_rating(self.avg + self.abias[review.aid])
 
 
-class SimpleModel(Model):
+class UserModel(BaseModel):
+    """
+    Model is : r = global_avg + user_bias
+    """
+    def __init__(self, nusers):
+        super(UserModel, self).__init__()
+        self.nusers = nusers
+        self.lrate = 0.01
+        self.reg_term = 0.01
+
+    def setup(self):
+        self.ubias = np.zeros(self.nusers)
+        self.avg = self.avg_rating()
+        self.size = len(self.review_list)
+
+    def iterate(self, review):
+        bu = self.ubias[review.uid]
+        pred = self.avg + bu
+        err = review.rating - pred    
+        self.ubias[review.uid] += self.lrate * (err - self.reg_term * bu)
+        return err**2
+
+    def predict(self, review):
+        return self.proper_rating(self.avg + self.ubias[review.uid])
+
+
+
+class SimpleModel(BaseModel):
     """
     Model is simple bias terms: mu + ubias + abias
+    """
+    def __init__(self, nusers, nitems):
+        super(SimpleModel, self).__init__()
+        self.nitems = nitems
+        self.nusers = nusers
+        self.lrate = 0.01
+        self.reg_term = 0.01
+
+    def setup(self):
+        self.ubias = np.zeros(self.nusers)
+        self.abias = np.zeros(self.nitems)
+        self.avg = self.avg_rating()
+        self.size = len(self.review_list)
+
+    def iterate(self, review):
+        bi = self.abias[review.aid]
+        bu = self.ubias[review.uid]
+        pred = self.avg + bi + bu
+        err = review.rating - pred    
+        self.abias[review.aid] += self.lrate * (err - self.reg_term * bi)
+        self.ubias[review.uid] += self.lrate * (err - self.reg_term * bu)
+        return err**2
+
+    def predict(self, review):
+        return self.proper_rating(self.avg + self.abias[review.aid] + self.ubias[review.uid])
+
+
+
+
+
+
+
+class TimeBias(Model):
+    """
+    Model is simple bias terms: mu + ubias + abias + location|time|bias
     """
     def __init__(self, nusers, nitems):
         super(SimpleModel, self).__init__()
@@ -150,7 +248,6 @@ class SimpleModel(Model):
 
     def predict(self, review):
         return self.proper_rating(self.avg + self.abias[review.aid] + self.ubias[review.uid])
-
 
 
 class SVD(Model):

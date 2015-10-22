@@ -1,6 +1,5 @@
 
 """
-Branched from RSVD.py
 This is a wrapper class to execute models from models.py
 
 Ref: Improving regularized singular value decomposition for
@@ -13,14 +12,12 @@ import sys
 import random
 from time import time, sleep
 from helper import Parse, Review
-from models import PlainSVD, BiasSVD, SimpleModel, AidAverage, GlobalAverage
+from models import *
 from itertools import product, izip
 import json
 import pdb
 
 from sklearn import cross_validation
-
-
 from math import log10, floor
 
 
@@ -61,8 +58,6 @@ class ModelWrapper(object):
 
     
     def output_preds(self, model):
-
-
         mean_error = 0.
         train_error = 0.
 
@@ -81,7 +76,6 @@ class ModelWrapper(object):
             model.train(train_list)
             train_error += model.get_rmse()
             mean_error += model.test(test_list)
-
             
         test_err = mean_error/5
         train_err = train_error/5
@@ -93,27 +87,20 @@ class ModelWrapper(object):
     def start(self, model):
         mean_error = 0.
         train_error = 0.
-
         t0 = time()
         
-        if model.verbose:
-            sys.stdout.flush()
-            sys.stdout.write('\r CV loop #{}\n'.format(i+1))
-
         kf = cross_validation.KFold(len(self.review_list), n_folds=5, shuffle=True, random_state = 0)
-        for train_idx, test_idx in kf:
 
+        for train_idx, test_idx in kf:
             test_list = [ self.review_list[idx] for idx in test_idx ]
             train_list = [ self.review_list[idx] for idx in train_idx ]
 
             model.train(train_list)
             train_error += model.get_rmse()
             mean_error += model.test(test_list)
-
-            
+    
         test_err = mean_error/5
         train_err = train_error/5
-
         print 'test error: {:.3f}, train error {:.3f}, time {:.2f}mins'.format(test_err, train_err, (time()-t0)/60)
         return test_err
 
@@ -123,60 +110,69 @@ def round_to_1(x):
 
 
 def run():
-    # print command line arguments
+    
+    #############Load Data####################
+
     print "Loading Data...."
     data = Parse('../data/mod_trip_advisor.db')
-    nusers = len( set( map(lambda x: x.uid, data.review_list)) )
+    #nusers = len( set( map(lambda x: x.uid, data.review_list)) )
     nitems = len( set( map(lambda x: x.aid, data.review_list)) )
-    
-    model = BiasSVD(nusers, nitems)
-    #model = PlainSVD(nusers, nitems)
-    #model = SimpleModel(nusers, nitems)
-    #model = AidAverage()
-    #model = GlobalAverage()
-    model.verbose = False
-    
-    print "Running Model ..."
-    mw = ModelWrapper(data.review_list)
 
-    savename = 'biasSVD_kfolds3'
+    ############# Model Selection ####################
+    
+    #model = BiasSVD(nusers, nitems)
+    #model = PlainSVD(nusers, nitems)
+    #model = AidAverage()
+
+    #model = BaseModel()
+    model = ItemModel(nitems)
+    #model = UserModel(nusers)    
+    #model = SimpleModel(nusers, nitems)
+
+    ############# Model Setup ####################
+
+    print "Running Model ..."
+    savename = 'usermodel1'
+
+    model.verbose = False
+    mw = ModelWrapper(data.review_list)
     mw.save_file = savename + '.npy'
-    #mw.start(model)
+
+    paramsearch = False
+    singlerun = True
+
+    ############# Single Run ####################
+
+    model.max_train_iters = 10
+    model.lrate = 0.01
+    model.reg_term = 0.01
+
+    if singlerun:
+        mw.start(model)
+
+    ############# Parameter Search ####################
     
     #reg_terms = [round_to_1(x) for x in np.logspace(log10(0.003), log10(0.03), num=5)]
     #reg_terms = [round_to_1(x) for x in np.logspace(log10(0.001), log10(0.1), num=3)]
     #lrates = [round_to_1(x) for x in np.logspace(log10(0.001), log10(0.1), num=5)]
-    lrates = [round_to_1(x) for x in np.linspace(0.001, 0.01, num=10)]
+    #lrates = [round_to_1(x) for x in np.linspace(0.001, 0.01, num=10)]
     #max_train_iters = [3,5,7]
-    nfeats = [10]
+    #nfeats = [10]
+    
+   
+    if paramsearch:
+        params = {'nfeats':nfeats, 'lrate':lrates}
+        with open(savename + '.json','w') as f:
+            json.dump(params.items(), f)
+        mw.param_search(model, params)
 
-    
-    
-    #params = {'max_train_iters':[6,8,10], 'nfeats':[5,10,15,20]}
-    model.max_train_iters = 5
-    params = {'nfeats':nfeats, 'lrate':lrates}
-    #model.max_train_iters = 1
-    model.lrate = 0.01
-    model.reg_term = 0.01
+if __name__ == '__main__':
+    run()
 
-    with open(savename + '.json','w') as f:
-        json.dump(params.items(), f)
 
-    
-    mw.param_search(model, params)
-    
+
 """
-Simple model
-parameters:  {'max_train_iters': 10, 'lrate': 0.01}
-test error: 0.763, train error 0.693, time 1.10mins
-
 SVD
 parameters:  {'nfeats': 10, 'lrate': 0.01, maxtrain: 5, lrate:0.01}
 test error: 0.761, train error 0.635, time 13.61mins
 """
-
-
-
-if __name__ == '__main__':
-    run()
-    #debug()
