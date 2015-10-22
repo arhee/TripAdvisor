@@ -84,6 +84,8 @@ class AidAverage(Model):
         return self.avgdict.get(review.aid, self.avg)
 
 
+################### Bias Models ######################
+
 class BaseModel(Model):
     """
     This is the base model: r = global_avg
@@ -115,10 +117,21 @@ class BaseModel(Model):
                 self.err_track.reset()
             self.err_track.update( self.iterate(review) )
 
+    def iterate(self, review):
+        pred = self.avg 
+        err = review.rating - pred    
+        return err**2
+
+    def predict(self, review):
+        return self.proper_rating(self.avg)
+
+    def setup(self):
+        self.avg = self.avg_rating()
+        self.size = len(self.review_list)
 
 class ItemModel(BaseModel):
     """
-    Model is : r = global_avg + item_bias
+    r = global_avg + item_bias(item)
     """
     def __init__(self, nitems):
         super(ItemModel, self).__init__()
@@ -141,10 +154,35 @@ class ItemModel(BaseModel):
     def predict(self, review):
         return self.proper_rating(self.avg + self.abias[review.aid])
 
+class LangModel(BaseModel):
+    """
+    r = global_avg + lang_bias(lang)
+    """
+    def __init__(self):
+        super(LangModel, self).__init__()
+        self.lrate = 0.01
+        self.reg_term = 0.01
+
+    def setup(self):
+        self.avg = self.avg_rating()
+        self.size = len(self.review_list)
+        self.lbias = {'ja':0}
+
+    def iterate(self, review):
+        if not review.lang in self.lbias:
+            return (review.rating - self.avg)**2
+        bl = self.lbias[review.lang]
+        pred = self.avg + bl
+        err = review.rating - pred    
+        self.lbias[review.lang] += self.lrate * (err - self.reg_term * bl)
+        return err**2
+
+    def predict(self, review):
+        return self.proper_rating(self.avg + self.lbias.get(review.lang,0))        
 
 class UserModel(BaseModel):
     """
-    Model is : r = global_avg + user_bias
+    r = global_avg + user_bias(user)
     """
     def __init__(self, nusers):
         super(UserModel, self).__init__()
@@ -167,11 +205,9 @@ class UserModel(BaseModel):
     def predict(self, review):
         return self.proper_rating(self.avg + self.ubias[review.uid])
 
-
-
-class SimpleModel(BaseModel):
+class CombinedModel(BaseModel):
     """
-    Model is simple bias terms: mu + ubias + abias
+    r = global_avg + user_bias(user) + item_bias(item)
     """
     def __init__(self, nusers, nitems):
         super(SimpleModel, self).__init__()
@@ -198,57 +234,40 @@ class SimpleModel(BaseModel):
     def predict(self, review):
         return self.proper_rating(self.avg + self.abias[review.aid] + self.ubias[review.uid])
 
-
-
-
-
-
-
-class TimeBias(Model):
+class MonthModel(BaseModel):
     """
-    Model is simple bias terms: mu + ubias + abias + location|time|bias
+    r = global_avg + month_loc_bias(location, month)
     """
-    def __init__(self, nusers, nitems):
-        super(SimpleModel, self).__init__()
+    def __init__(self, nitems):
+        super(MonthModel, self).__init__()
         self.nitems = nitems
-        self.nusers = nusers
         self.lrate = 0.01
         self.reg_term = 0.01
 
     def setup(self):
-        self.ubias = np.zeros(self.nusers)
+        #self.mbias = None
         self.abias = np.zeros(self.nitems)
         self.avg = self.avg_rating()
         self.size = len(self.review_list)
 
-    def train(self, review_list):
-        self.review_list = review_list
-        self.setup()
-        for _ in range(self.max_train_iters):
-            self.stoc_grad_desc()
-        if self.verbose:
-            print "Total Training RMSE {:.3f}".format(self.get_rmse())
-
-    def stoc_grad_desc(self):
-        self.err_track = ErrorTracker()
-        for idx, review in enumerate(self.review_list):
-            if self.verbose and idx > 0 and not idx % self.print_iter:
-                print "iteration #:{} smoothed error: {:.3f}".format(idx, self.err_track.get_err())
-                self.err_track.reset()
-            self.err_track.update( self.iterate(review) )
-
     def iterate(self, review):
-        bi = self.abias[review.aid]
-        bu = self.ubias[review.uid]
-        pred = self.avg + bi + bu
+        if not review.date.month in self.mbias:
+            return (review.rating - self.avg)**2
+            
+        bm = self.mbias[review.date.month]
+
+        #bi = self.abias[review.aid]
+        pred = self.avg + bm
         err = review.rating - pred    
-        self.abias[review.aid] += self.lrate * (err - self.reg_term * bi)
-        self.ubias[review.uid] += self.lrate * (err - self.reg_term * bu)
+        self.mbias[review.date.month] += self.lrate * (err - self.reg_term * bm)
+        #self.abias[review.aid] += self.lrate * (err - self.reg_term * bi)
         return err**2
 
     def predict(self, review):
-        return self.proper_rating(self.avg + self.abias[review.aid] + self.ubias[review.uid])
+        return self.proper_rating(self.avg + self.mbias.get(review.date.month, 0))
 
+
+################# The SVD class of models #####################
 
 class SVD(Model):
     def __init__(self, nusers, nitems): 
@@ -260,7 +279,6 @@ class SVD(Model):
         self.lrate = 0.04
         self.reg_term = 0.01
         self.initbias = 0
-
 
     def setup(self):
         self.size = len(self.review_list)

@@ -16,6 +16,7 @@ from models import *
 from itertools import product, izip
 import json
 import pdb
+import pickle
 
 from sklearn import cross_validation
 from math import log10, floor
@@ -110,13 +111,17 @@ def round_to_1(x):
 
 
 def run():
+    ############# Iniitiate Data ####################    
     
-    #############Load Data####################
+#    data = Parse('../data/mod_trip_advisor.db')
+#    pickle.dump( data, open( "tripadv.p", "wb" ) )
 
-    print "Loading Data...."
-    data = Parse('../data/mod_trip_advisor.db')
+    ############# Load Data ####################
+    #print "Loading Data...."
+    #data = pickle.load(open( "tripadv.p"))
+    
     #nusers = len( set( map(lambda x: x.uid, data.review_list)) )
-    nitems = len( set( map(lambda x: x.aid, data.review_list)) )
+    #nitems = len( set( map(lambda x: x.aid, data.review_list)) )
 
     ############# Model Selection ####################
     
@@ -124,8 +129,10 @@ def run():
     #model = PlainSVD(nusers, nitems)
     #model = AidAverage()
 
-    #model = BaseModel()
-    model = ItemModel(nitems)
+    basemodel = BaseModel()
+    #model = ItemModel(nitems)
+    model = MonthModel(data.nitems)
+    #model = LangModel()
     #model = UserModel(nusers)    
     #model = SimpleModel(nusers, nitems)
 
@@ -133,8 +140,8 @@ def run():
 
     print "Running Model ..."
     savename = 'usermodel1'
-
-    model.verbose = False
+#
+#    model.verbose = False
     mw = ModelWrapper(data.review_list)
     mw.save_file = savename + '.npy'
 
@@ -143,12 +150,50 @@ def run():
 
     ############# Single Run ####################
 
-    model.max_train_iters = 10
+    model.max_train_iters = 15
     model.lrate = 0.01
     model.reg_term = 0.01
 
-    if singlerun:
-        mw.start(model)
+
+    ############# Feature Searching #############
+
+    #Look for month biases
+    months = range(1,13)
+    err = round(mw.start(basemodel), 3)
+    selected = []
+
+    """
+    for month in months:
+        model.mbias = {month:0}
+        if mw.start(model) < err:
+            print 'added ', month
+            selected.append(month)
+    """
+
+    months = [2,3,4,6,7,8,9,10,12]
+    model.mbias = dict(zip(months, [0]*len(months)))
+    mw.start(model)
+
+
+    """    
+    #iterate to find language biases
+
+    langlist = [u'en', u'fr', u'ru', u'ro', u'it', u'ja', u'nl', u'es', u'pt',
+       u'de', u'ko', u'vi', u'da', u'zh-tw', u'no', u'zh-cn', u'id', u'th',
+       u'pl', u'he', u'el', u'sv', u'tr', u'af', u'fi', u'hu', u'cs',
+       u'et', u'ar', None, u'ca', u'so', u'mk', u'sl', u'sk', u'bg', u'cy',
+       u'tl']
+    err = round(mw.start(basemodel), 3)
+
+    selected = []
+    for lang in langlist:
+        model.lbias = {lang:0}
+        if mw.start(model) < err:
+            print "added ", lang
+            selected.append(lang)
+
+    print selected
+    """
 
     ############# Parameter Search ####################
     
