@@ -1,4 +1,4 @@
-# tripadvisor
+# tripadvisor (under construction)
 
 Tripadvisor analysis.  Main presentation contained in <a href="http://nbviewer.ipython.org/github/arhee/tripadvisor/blob/master/tripadvisor.ipynb">tripadvisor.ipynb</a>
 
