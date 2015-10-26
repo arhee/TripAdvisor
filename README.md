@@ -1,4 +1,4 @@
-# tripadvisor (under construction)
+# tripadvisor
 This is a three part project.
 
 1. A summary of the <a href="http://nbviewer.ipython.org/github/arhee/tripadvisor/blob/master/scraping.ipynb">TripAdvisor scraper</a>
