@@ -133,18 +133,19 @@ class ItemModel(BaseModel):
     """
     r = global_avg + item_bias(item)
     """
-    def __init__(self, nitems):
+    def __init__(self):
         super(ItemModel, self).__init__()
-        self.nitems = nitems
         self.lrate = 0.01
         self.reg_term = 0.01
 
     def setup(self):
-        self.abias = np.zeros(self.nitems)
+        self.abias = {}
         self.avg = self.avg_rating()
         self.size = len(self.review_list)
 
     def iterate(self, review):
+        if review.aid not in self.abias:
+            self.abias[review.aid] = 0
         bi = self.abias[review.aid]
         pred = self.avg + bi
         err = review.rating - pred    
@@ -152,7 +153,47 @@ class ItemModel(BaseModel):
         return err**2
 
     def predict(self, review):
-        return self.proper_rating(self.avg + self.abias[review.aid])
+        bi = self.abias.get(review.aid,0)
+        return self.proper_rating(self.avg + bi)
+
+
+class LangItemModel(BaseModel):
+    """
+    r = global_avg + item_bias(item) + lang_bias(lang)
+    """
+    def __init__(self):
+        super(LangItemModel, self).__init__()
+        self.lrate = 0.01
+        self.reg_term = 0.01
+
+    def setup(self):
+        self.avg = self.avg_rating()
+        self.size = len(self.review_list)
+        self.lbias = {'ja':0}
+        self.abias = {}
+
+    def iterate(self, review):
+        bl = 0
+        if review.lang in self.lbias:
+            bl = self.lbias[review.lang]
+
+        if review.aid not in self.abias:
+            self.abias[review.aid] = 0
+        bi = self.abias[review.aid]
+
+        pred = self.avg + bl + bi
+        err = review.rating - pred    
+
+        if review.lang in self.lbias:
+            self.lbias[review.lang] += self.lrate * (err - self.reg_term * bl)
+        self.abias[review.aid] += self.lrate * (err - self.reg_term * bi)
+        return err**2
+
+    def predict(self, review):
+        bl = self.lbias.get(review.lang,0)
+        bi = self.abias.get(review.aid,0)
+        return self.proper_rating(self.avg + bi + bl)
+
 
 class LangModel(BaseModel):
     """
@@ -184,18 +225,20 @@ class UserModel(BaseModel):
     """
     r = global_avg + user_bias(user)
     """
-    def __init__(self, nusers):
+    def __init__(self):
         super(UserModel, self).__init__()
-        self.nusers = nusers
+        #self.nusers = nusers
         self.lrate = 0.01
         self.reg_term = 0.01
 
     def setup(self):
-        self.ubias = np.zeros(self.nusers)
+        self.ubias = {}
         self.avg = self.avg_rating()
         self.size = len(self.review_list)
 
     def iterate(self, review):
+        if review.uid not in self.ubias:
+            self.ubias[review.uid] = 0
         bu = self.ubias[review.uid]
         pred = self.avg + bu
         err = review.rating - pred    
@@ -203,68 +246,385 @@ class UserModel(BaseModel):
         return err**2
 
     def predict(self, review):
-        return self.proper_rating(self.avg + self.ubias[review.uid])
+        bu = 0.
+        if review.uid in self.ubias:
+            bu = self.ubias[review.uid]
+        return self.proper_rating(self.avg + bu)
 
-class CombinedModel(BaseModel):
+
+class SelectUserModel(BaseModel):
     """
-    r = global_avg + user_bias(user) + item_bias(item)
+    r = global_avg + user_bias(user_from_uidset)
     """
-    def __init__(self, nusers, nitems):
-        super(SimpleModel, self).__init__()
-        self.nitems = nitems
-        self.nusers = nusers
+    def __init__(self):
+        super(SelectUserModel, self).__init__()
+        self.uidset = None
         self.lrate = 0.01
         self.reg_term = 0.01
 
     def setup(self):
-        self.ubias = np.zeros(self.nusers)
-        self.abias = np.zeros(self.nitems)
+        self.ubias = {}
         self.avg = self.avg_rating()
         self.size = len(self.review_list)
 
     def iterate(self, review):
-        bi = self.abias[review.aid]
+        if review.uid not in self.uidset:
+            return (self.avg - review.rating)**2
+
+        if review.uid not in self.ubias:
+            self.ubias[review.uid] = 0
         bu = self.ubias[review.uid]
-        pred = self.avg + bi + bu
+        pred = self.avg + bu
         err = review.rating - pred    
-        self.abias[review.aid] += self.lrate * (err - self.reg_term * bi)
         self.ubias[review.uid] += self.lrate * (err - self.reg_term * bu)
         return err**2
 
     def predict(self, review):
-        return self.proper_rating(self.avg + self.abias[review.aid] + self.ubias[review.uid])
+        if review.uid not in self.uidset:
+            return self.avg
+        bu = 0.
+        if review.uid in self.ubias:
+            bu = self.ubias[review.uid]
+        return self.proper_rating(self.avg + bu)
 
-class MonthModel(BaseModel):
+
+class SelectItemModel(BaseModel):
     """
-    r = global_avg + month_loc_bias(location, month)
+    r = global_avg + item_bias(item)
     """
-    def __init__(self, nitems):
-        super(MonthModel, self).__init__()
-        self.nitems = nitems
+    def __init__(self):
+        super(SelectItemModel, self).__init__()
         self.lrate = 0.01
         self.reg_term = 0.01
 
     def setup(self):
-        #self.mbias = None
-        self.abias = np.zeros(self.nitems)
+        self.avg = self.avg_rating()
+        self.size = len(self.review_list)
+        self.abias = dict(zip(self.items, [0]*len(self.items)))
+
+    def iterate(self, review):
+        if not review.aid in self.abias:
+            return (review.rating - self.avg)**2
+
+        bi = self.abias[review.aid]
+        pred = self.avg + bi
+        err = review.rating - pred    
+        self.abias[review.aid] += self.lrate * (err - self.reg_term * bi)
+        return err**2
+
+    def predict(self, review):
+        abias = self.abias.get(review.aid, 0)
+        return self.proper_rating(self.avg + abias)
+
+class ItemMonthModel(BaseModel):
+    """
+    r = global_avg + month_loc_bias(location, month)
+    """
+    def __init__(self):
+        super(ItemMonthModel, self).__init__()
+        self.lrate = 0.01
+        self.reg_term = 0.01
+
+    def setup(self):
+        self.avg = self.avg_rating()
+        self.size = len(self.review_list)
+        emptydicts = [np.zeros(12) for _ in range(len(self.items))]
+        self.ambias = dict(zip(self.items, emptydicts))
+
+    def iterate(self, review):
+        if not review.aid in self.items:
+            return (review.rating - self.avg)**2
+        bam = self.ambias[review.aid][review.review_date.month-1]
+        pred = self.avg + bam
+        err = review.rating - pred    
+        self.ambias[review.aid][review.review_date.month-1] += self.lrate * (err - self.reg_term * bam)
+        return err**2
+
+    def predict(self, review):
+        if review.aid in self.ambias:
+            bias = self.ambias[review.aid][review.review_date.month-1]
+        else:
+            bias = 0
+
+        return self.proper_rating(self.avg + bias)
+
+class UserTagModel(BaseModel):
+    """
+    r = global_avg + user_group_bias(user, tags)
+    """
+    def __init__(self):
+        super(UserGroupModel, self).__init__()
+        self.lrate = 0.01
+        self.reg_term = 0.01
+        self.uidset = None
+
+    def setup(self):
+        self.ubias = {}
         self.avg = self.avg_rating()
         self.size = len(self.review_list)
 
     def iterate(self, review):
-        if not review.date.month in self.mbias:
+        if review.uid not in self.uidset:
             return (review.rating - self.avg)**2
-            
-        bm = self.mbias[review.date.month]
 
-        #bi = self.abias[review.aid]
-        pred = self.avg + bm
+        if not review.uid in self.ubias:
+            self.ubias[review.uid] = {}
+
+        bias = 0.
+        for tag in review.tags:
+            if tag in self.ubias[review.uid]:
+                bias += self.ubias[review.uid][tag]
+            else:
+                self.ubias[review.uid][tag] = 0
+
+        pred = self.avg + bias
         err = review.rating - pred    
-        self.mbias[review.date.month] += self.lrate * (err - self.reg_term * bm)
-        #self.abias[review.aid] += self.lrate * (err - self.reg_term * bi)
+
+        for tag in review.tags:
+            bias = self.ubias[review.uid][tag]
+            self.ubias[review.uid][tag] += self.lrate * (err - self.reg_term * bias)
         return err**2
 
     def predict(self, review):
-        return self.proper_rating(self.avg + self.mbias.get(review.date.month, 0))
+        if review.uid not in self.uidset:
+            return self.proper_rating(self.avg)
+
+        bias = 0.
+        if review.uid in self.ubias:
+            for tag in review.tags:
+                bias += self.ubias[review.uid].get(tag, 0)
+        return self.proper_rating(self.avg + bias)
+
+class UserGroupModel(BaseModel):
+    """
+    r = global_avg + user_group_bias(user, group) + user_bias(user)
+    """
+    def __init__(self):
+        super(UserGroupModel, self).__init__()
+        self.lrate = 0.01
+        self.reg_term = 0.01
+        self.uidset = None
+
+        #group is idx, groupsize is kmeans cluster size
+        self.group = None
+        self.groupsize = None
+
+    def setup(self):
+        self.gbias = {}
+        self.ubias = {}
+        self.avg = self.avg_rating()
+        self.size = len(self.review_list)
+
+    def iterate(self, review):
+        if review.uid not in self.uidset or not review.kgroup:
+            return (review.rating - self.avg)**2
+
+        #if the user dict does not contain records of the user
+        if not review.uid in self.gbias:
+            self.gbias[review.uid] = np.zeros(self.groupsize)
+            self.ubias[review.uid] = 0
+
+        kgrp = review.kgroup[self.group] - 1
+        bg = self.gbias[review.uid][kgrp]
+        bu = self.ubias[review.uid]
+
+        pred = self.avg + bg + bu
+        err = review.rating - pred    
+
+        self.gbias[review.uid][kgrp] += self.lrate * (err - self.reg_term * bg)
+        self.ubias[review.uid] += self.lrate * (err - self.reg_term * bu)
+        return err**2
+
+    def predict(self, review):
+        if review.uid not in self.gbias or not review.kgroup:
+            return self.proper_rating(self.avg)
+
+        kgrp = review.kgroup[self.group] - 1
+        bg = self.gbias[review.uid][kgrp]
+        bu = self.ubias[review.uid]
+        return self.proper_rating(self.avg + bg + bu)
+
+class GroupModel(BaseModel):
+    """
+    r = global_avg + user_group_bias(user, group)
+    """
+    def __init__(self):
+        super(GroupModel, self).__init__()
+        self.lrate = 0.01
+        self.reg_term = 0.01
+        self.uidset = None
+
+        #group is idx, groupsize is kmeans cluster size
+        self.group = None
+        self.groupsize = None
+
+    def setup(self):
+        self.ubias = {}
+        self.avg = self.avg_rating()
+        self.size = len(self.review_list)
+
+    def iterate(self, review):
+        if review.uid not in self.uidset or not review.kgroup:
+            return (review.rating - self.avg)**2
+
+        #if the user dict does not contain records of the user
+        if not review.uid in self.ubias:
+            self.ubias[review.uid] = np.zeros(self.groupsize)
+        kgrp = review.kgroup[self.group] - 1
+        bg = self.ubias[review.uid][kgrp]
+
+        pred = self.avg + bg
+        err = review.rating - pred    
+
+        self.ubias[review.uid][kgrp] += self.lrate * (err - self.reg_term * bg)
+        return err**2
+
+    def predict(self, review):
+        if review.uid not in self.ubias or not review.kgroup:
+            return self.proper_rating(self.avg)
+
+        kgrp = review.kgroup[self.group] - 1
+        return self.proper_rating(self.avg + self.ubias[review.uid][kgrp])
+
+class CombinedModelAll(BaseModel):
+    def __init__(self):
+        super(CombinedModel, self).__init__()
+        self.lrate = 0.01
+        self.reg_term = 0.01
+
+    def setup(self):
+        self.ubias = {}
+        self.gbias = {}
+        self.abias = {}
+        self.avg = self.avg_rating()
+        self.size = len(self.review_list)
+        emptydicts = [np.zeros(12) for _ in range(len(self.aid_list))]
+        self.ambias = dict(zip(self.aid_list, emptydicts))
+
+
+    def iterate(self, review):
+#        if review.uid not in self.ubias:
+#            self.ubias[review.uid] = 0
+
+        # ambias takes priority.  Leftovers go into abias.
+        bam = 0.
+        ba = 0.
+        if review.aid in self.ambias:
+            bam = self.ambias[review.aid][review.review_date.month-1]
+        elif review.aid not in self.abias:
+            self.abias[review.aid] = 0
+        else:
+            ba = self.abias[review.aid]
+
+
+        # gbias takes priority over ubias
+        bg = bu = 0
+        if review.kgroup:
+            if not review.uid in self.gbias:
+                self.gbias[review.uid] = np.zeros(self.groupsize)
+            kgrp = review.kgroup[self.group] - 1
+            bg = self.gbias[review.uid][kgrp]
+        else:
+            if not review.uid in self.ubias:
+                self.ubias[review.uid] = 0
+            bu = self.ubias[review.uid]
+
+
+        #bu = self.ubias[review.uid]
+        pred = self.avg + ba + bam + bg + bu
+        err = review.rating - pred 
+
+        #self.ubias[review.uid] += self.lrate * (err - self.reg_term * bu)
+
+        if review.aid in self.ambias:
+            self.ambias[review.aid][review.review_date.month-1] += self.lrate * (err - self.reg_term * bam)
+        else:
+            self.abias[review.aid] += self.lrate * (err - self.reg_term * ba)
+
+        if review.kgroup:
+            kgrp = review.kgroup[self.group] - 1
+            self.gbias[review.uid][kgrp] += self.lrate * (err - self.reg_term * bg)
+        else:
+            self.ubias[review.uid] += self.lrate * (err - self.reg_term * bu)
+
+        return err**2
+
+    def predict(self, review):
+        if review.kgroup and review.uid in self.gbias:
+            kgrp = review.kgroup[self.group] - 1
+            bu = self.gbias[review.uid][kgrp]
+        else:
+            bu = self.ubias.get(review.uid, 0)
+
+        ba = self.abias.get(review.aid, 0)
+
+        bam = 0.
+        if review.aid in self.ambias:
+            bam = self.ambias[review.aid][review.review_date.month-1]
+
+        return self.proper_rating(self.avg + bu + ba + bam)
+
+
+class CombinedModel(BaseModel):
+    def __init__(self):
+        super(CombinedModel, self).__init__()
+        self.lrate = 0.01
+        self.reg_term = 0.01
+
+    def setup(self):
+        self.ubias = {}
+        self.abias = {}
+        self.avg = self.avg_rating()
+        self.size = len(self.review_list)
+        emptydicts = [np.zeros(12) for _ in range(len(self.aid_list))]
+        self.ambias = dict(zip(self.aid_list, emptydicts))
+        self.lbias = {'ja':0}
+
+
+    def iterate(self, review):
+        if review.uid not in self.ubias:
+            self.ubias[review.uid] = 0
+
+        bl = 0.
+        if review.lang in self.lbias:
+            bl = self.lbias[review.lang]
+        
+        # ambias takes priority.  Leftovers go into abias.
+        bam = 0.
+        ba = 0.
+        if review.aid in self.ambias:
+            bam = self.ambias[review.aid][review.review_date.month-1]
+        elif review.aid not in self.abias:
+            self.abias[review.aid] = 0
+        else:
+            ba = self.abias[review.aid]
+
+        bu = self.ubias[review.uid]
+        pred = self.avg + ba + bam + bu + bl
+        err = review.rating - pred 
+
+        #self.ubias[review.uid] += self.lrate * (err - self.reg_term * bu)
+
+        if review.aid in self.ambias:
+            self.ambias[review.aid][review.review_date.month-1] += self.lrate * (err - self.reg_term * bam)
+        else:
+            self.abias[review.aid] += self.lrate * (err - self.reg_term * ba)
+        
+        if review.lang in self.lbias:
+            self.lbias[review.lang] += self.lrate * (err - self.reg_term * bl)
+        
+        self.ubias[review.uid] += self.lrate * (err - self.reg_term * bu)
+        return err**2
+
+    def predict(self, review):
+        bu = self.ubias.get(review.uid, 0)
+        ba = self.abias.get(review.aid, 0)
+        bl = self.lbias.get(review.lang, 0)
+        bam = 0.
+        if review.aid in self.ambias:
+            bam = self.ambias[review.aid][review.review_date.month-1]
+
+        return self.proper_rating(self.avg + bu + ba + bam + bl)    
 
 
 ################# The SVD class of models #####################

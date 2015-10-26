@@ -17,6 +17,7 @@ from itertools import product, izip
 import json
 import pdb
 import pickle
+import sqlite3
 
 from sklearn import cross_validation
 from math import log10, floor
@@ -56,36 +57,9 @@ class ModelWrapper(object):
                 np.save(f, data)
 
         return data
-
-    
-    def output_preds(self, model):
-        mean_error = 0.
-        train_error = 0.
-
-        t0 = time()
-        
-        if model.verbose:
-            sys.stdout.flush()
-            sys.stdout.write('\r CV loop #{}\n'.format(i+1))
-
-        kf = cross_validation.KFold(len(self.review_list), n_folds=5, shuffle=True, random_state = 0)
-        for train_idx, test_idx in kf:
-
-            test_list = [ self.review_list[idx] for idx in test_idx ]
-            train_list = [ self.review_list[idx] for idx in train_idx ]
-
-            model.train(train_list)
-            train_error += model.get_rmse()
-            mean_error += model.test(test_list)
-            
-        test_err = mean_error/5
-        train_err = train_error/5
-
-        print 'test error: {:.3f}, train error {:.3f}, time {:.2f}mins'.format(test_err, train_err, (time()-t0)/60)
-        return test_err
-
     
     def start(self, model):
+        print model.__class__
         mean_error = 0.
         train_error = 0.
         t0 = time()
@@ -102,7 +76,7 @@ class ModelWrapper(object):
     
         test_err = mean_error/5
         train_err = train_error/5
-        print 'test error: {:.3f}, train error {:.3f}, time {:.2f}mins'.format(test_err, train_err, (time()-t0)/60)
+        print 'test error: {}, train error {:.3f}, time {:.2f}mins'.format(test_err, train_err, (time()-t0)/60)
         return test_err
 
 
@@ -113,40 +87,56 @@ def round_to_1(x):
 def run():
     ############# Iniitiate Data ####################    
     
-#    data = Parse('../data/mod_trip_advisor.db')
-#    pickle.dump( data, open( "tripadv.p", "wb" ) )
+    print "reading data"
+    dbname = '../data/mod_trip_advisor.db'
+    #data = Parse(dbname)
+    #pickle.dump( data, open( "tripadv.p", "wb" ) )
 
     ############# Load Data ####################
     #print "Loading Data...."
-    #data = pickle.load(open( "tripadv.p"))
+    #data = pickle.load(open("tripadv.p"))
     
     #nusers = len( set( map(lambda x: x.uid, data.review_list)) )
     #nitems = len( set( map(lambda x: x.aid, data.review_list)) )
 
     ############# Model Selection ####################
     
+    # SVD
     #model = BiasSVD(nusers, nitems)
     #model = PlainSVD(nusers, nitems)
     #model = AidAverage()
 
-    basemodel = BaseModel()
-    #model = ItemModel(nitems)
-    model = MonthModel(data.nitems)
+    # Linear Models
+    #model = BaseModel()
+    #model = ItemModel()
+    #model = ItemMonthModel()
+    #selectmodel = SelectItemModel()
+    
+    #model = UserModel()
+    #model = LangItemModel()
     #model = LangModel()
-    #model = UserModel(nusers)    
-    #model = SimpleModel(nusers, nitems)
+    #model = UserGroupModel()
+    #model = SelectUserModel()
+
+    #model = GroupModel()
+    #basemodel = SelectUserModel()
+    #UserGroupModel()
+
+    model = CombinedModel()
 
     ############# Model Setup ####################
 
     print "Running Model ..."
     savename = 'usermodel1'
-#
-#    model.verbose = False
+
+    model.verbose = False
     mw = ModelWrapper(data.review_list)
     mw.save_file = savename + '.npy'
 
-    paramsearch = False
-    singlerun = True
+    paramsearch = 0
+    singlerun = 0
+    featsearch = 0
+    itemmonth = 0
 
     ############# Single Run ####################
 
@@ -154,15 +144,63 @@ def run():
     model.lrate = 0.01
     model.reg_term = 0.01
 
+    if singlerun:
+        mw.start(model)
 
     ############# Feature Searching #############
 
-    #Look for month biases
-    months = range(1,13)
-    err = round(mw.start(basemodel), 3)
-    selected = []
+    # Group Model Comparison 
+    model.group = 0
+    model.groupsize = 10
+    attrlist = pickle.load(open('item_months1000.p'))
+    model.aid_list = [x[0] for x in attrlist]
+    mw.start(model)
 
+
+    #mw.start(basemodel)
+
+
+    # Finding month/aid combinatorial biases 
     """
+    if itemmonth:
+        attrlist = pickle.load(open('item_months1000.p'))
+        model.items = [x[0] for x in attrlist]
+        mw.start(model)
+
+        selectmodel.items = model.items
+        mw.start(selectmodel)
+    """
+
+    #Search for attractions that give benefit
+    """
+    aid_list = pickle.load(open('attr100.p'))
+    results = []
+    for ix, item in enumerate(aid_list):
+        
+        #abias
+        selectmodel.items = [item]
+        err = mw.start(selectmodel)
+        #print '-'*10, 'abias'
+        #print singlemodel.abias
+        
+        #monthbias
+        model.items = [item]
+        month_err = mw.start(model)
+        #print '-'*10, 'ambias'
+        #print model.ambias
+        
+        diff = month_err - err
+        print 'item #:', ix, 'diff: ', diff
+        if month_err < err:
+            print "\n Added! {:.3f}".format(diff)
+            results.append((item, diff))
+
+    pickle.dump( results, open( "item_months100.p", "wb" ) )
+    """
+    
+    #Look for biases in months
+    """
+    months = range(1,13)
     for month in months:
         model.mbias = {month:0}
         if mw.start(model) < err:
@@ -170,14 +208,8 @@ def run():
             selected.append(month)
     """
 
-    months = [2,3,4,6,7,8,9,10,12]
-    model.mbias = dict(zip(months, [0]*len(months)))
-    mw.start(model)
-
-
-    """    
     #iterate to find language biases
-
+    """   
     langlist = [u'en', u'fr', u'ru', u'ro', u'it', u'ja', u'nl', u'es', u'pt',
        u'de', u'ko', u'vi', u'da', u'zh-tw', u'no', u'zh-cn', u'id', u'th',
        u'pl', u'he', u'el', u'sv', u'tr', u'af', u'fi', u'hu', u'cs',
