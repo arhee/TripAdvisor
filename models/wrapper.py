@@ -112,17 +112,19 @@ def run():
     #model = ItemMonthModel()
     #selectmodel = SelectItemModel()
     
-    #model = UserModel()
+    basemodel = UserModel()
     #model = LangItemModel()
     #model = LangModel()
-    #model = UserGroupModel()
+    model = UserGroupModel()
+
+    #basemodel = SelectUserModel()
     #model = SelectUserModel()
 
     #model = GroupModel()
-    #basemodel = SelectUserModel()
+    
     #UserGroupModel()
 
-    model = CombinedModel()
+    #model = CombinedModel()
 
     ############# Model Setup ####################
 
@@ -154,10 +156,13 @@ def run():
     model.groupsize = 10
     attrlist = pickle.load(open('item_months1000.p'))
     model.aid_list = [x[0] for x in attrlist]
+
+    uidlist = pickle.load(open('uidall.p'))
+    model.uidset = basemodel.uidset = set(uidlist)
     mw.start(model)
 
 
-    #mw.start(basemodel)
+    mw.start(basemodel)
 
 
     # Finding month/aid combinatorial biases 
