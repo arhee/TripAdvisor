@@ -1,7 +1,7 @@
 # tripadvisor (under construction)
 This is a three part project.
 
-1. Explanation for the <a href="http://nbviewer.ipython.org/github/arhee/tripadvisor/blob/master/scraping.ipynb">TripAdvisor scraper</a>
+1. A summary of the <a href="http://nbviewer.ipython.org/github/arhee/tripadvisor/blob/master/scraping.ipynb">TripAdvisor scraper</a>
 
 2. The <a href="http://nbviewer.ipython.org/github/arhee/tripadvisor/blob/master/tripadvisor.ipynb">analysis</a>
 
