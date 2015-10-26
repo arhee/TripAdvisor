@@ -1,10 +1,13 @@
 # tripadvisor (under construction)
+This is a three part project.
 
-Tripadvisor analysis.  Main presentation contained in <a href="http://nbviewer.ipython.org/github/arhee/tripadvisor/blob/master/tripadvisor.ipynb">tripadvisor.ipynb</a>
+1. The <a href="http://nbviewer.ipython.org/github/arhee/tripadvisor/blob/master/scraping.ipynb">TripAdvisor Scraper</a>
 
-Description of the model can be found <a href="http://nbviewer.ipython.org/github/arhee/tripadvisor/blob/master/model.ipynb">here</a>
+2. The <a href="http://nbviewer.ipython.org/github/arhee/tripadvisor/blob/master/tripadvisor.ipynb">analysis</a>
 
-Tripadvisor scraper located <a href="https://github.com/arhee/tripadvisor_scraper"> here </a>
+3. The <a href="http://nbviewer.ipython.org/github/arhee/tripadvisor/blob/master/revised_model.ipynb">model</a>
+
+The code for the Tripadvisor scraper located <a href="https://github.com/arhee/tripadvisor_scraper"> here </a>
 
 #### data
 
